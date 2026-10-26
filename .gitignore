@@ -1,0 +1,27 @@
+# Gradle / Android
+.gradle/
+.tooling/
+.gradle-home/
+.android-home/
+.test-home/
+.kotlin/
+build/
+*/build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
