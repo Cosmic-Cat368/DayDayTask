@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- 导出包写在 cache/exports，通过 FileProvider 临时授权分享。 -->
+    <cache-path
+        name="exports"
+        path="exports/" />
+</paths>
