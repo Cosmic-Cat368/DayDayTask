@@ -24,6 +24,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.taskrecall.ui.addtask.AddTaskScreen
+import com.example.taskrecall.ui.archive.ArchiveScreen
 import com.example.taskrecall.ui.detail.DetailScreen
 import com.example.taskrecall.ui.home.HomeScreen
 import com.example.taskrecall.ui.home.HomeViewModel
@@ -69,6 +70,7 @@ fun TaskRecallApp(
                 onNextMonth = homeViewModel::nextMonth,
                 onGoToday = homeViewModel::goToToday,
                 onToggleTask = homeViewModel::toggleStatus,
+                onToggleSelectedDateTask = homeViewModel::toggleSelectedDateTask,
                 onOpenTask = { taskId ->
                     navController.navigate("detail/$taskId")
                 },
@@ -111,6 +113,14 @@ fun TaskRecallApp(
 
         composable("settings") {
             SettingsScreen(
+                viewModel = hiltViewModel(),
+                onBack = { navController.popBackStack() },
+                onOpenArchive = { navController.navigate("archive") },
+            )
+        }
+
+        composable("archive") {
+            ArchiveScreen(
                 viewModel = hiltViewModel(),
                 onBack = { navController.popBackStack() },
             )

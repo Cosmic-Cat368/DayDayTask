@@ -2,6 +2,7 @@ package com.example.taskrecall.ui.home
 
 import com.example.taskrecall.data.db.TaskEntity
 import com.example.taskrecall.domain.TaskStatus
+import com.example.taskrecall.domain.TaskType
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -11,6 +12,15 @@ data class TaskRowUi(
     val status: TaskStatus,
     val periodKey: String,
     val historyKind: HistoryKind? = null,
+)
+
+/** 已真删除的日常/周常在历史日期中的只读记录。 */
+data class ArchivedRecordUi(
+    val archiveId: Long,
+    val title: String,
+    val type: TaskType,
+    val status: TaskStatus,
+    val periodKey: String,
 )
 
 enum class HistoryKind {
@@ -51,6 +61,8 @@ data class HomeUiState(
     val longtermBTasks: List<TaskRowUi> = emptyList(),
     /** 选中非今天时，当天到期的任务及日常/周常记录。 */
     val selectedDateItems: List<TaskRowUi> = emptyList(),
+    /** 已删除日常/周常在该日期保留下来的只读归档记录。 */
+    val archivedDateItems: List<ArchivedRecordUi> = emptyList(),
 ) {
     val isTodaySelected: Boolean
         get() = selectedDate == today

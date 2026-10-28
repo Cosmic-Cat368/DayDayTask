@@ -2,6 +2,7 @@ package com.example.taskrecall.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.taskrecall.data.db.ArchivedTaskWithCompletions
 import com.example.taskrecall.data.db.CompletionEntity
 import com.example.taskrecall.data.db.TaskEntity
 import com.example.taskrecall.data.db.TaskOrderEntity
@@ -46,9 +47,10 @@ class HomeViewModel @Inject constructor(
         taskRepository.observeAllActiveTasks(),
         taskRepository.observeAllCompletions(),
         taskRepository.observeTaskOrders(),
+        taskRepository.observeArchivedTasks(),
         settingsRepository.showNextWeek,
-    ) { tasks, completions, orders, showNextWeek ->
-        HomeContent(tasks, completions, orders, showNextWeek)
+    ) { tasks, completions, orders, archived, showNextWeek ->
+        HomeContent(tasks, completions, orders, archived, showNextWeek)
     }
 
     val uiState: StateFlow<HomeUiState> = combine(
@@ -96,6 +98,19 @@ class HomeViewModel @Inject constructor(
     fun toggleStatus(task: TaskEntity) {
         viewModelScope.launch {
             taskRepository.toggleStatus(task, System.currentTimeMillis())
+        }
+    }
+
+    /**
+     * 历史日期视图的圆点点击。
+     * 使用该行在选中日期/周对应的 periodKey，而不是当前周期。
+     */
+    fun toggleSelectedDateTask(row: TaskRowUi) {
+        val today = DateTimeUtils.toLocalDate(now.value)
+        // 只允许修改过去日期；未来日期保持只读。
+        if (selectedDate.value >= today) return
+        viewModelScope.launch {
+            taskRepository.toggleStatusForPeriod(row.task, row.periodKey)
         }
     }
 
@@ -237,6 +252,11 @@ class HomeViewModel @Inject constructor(
         } else {
             emptyList()
         }
+        val archivedDateItems = if (selected != today) {
+            buildArchivedDateItems(content, selected)
+        } else {
+            emptyList()
+        }
 
         return HomeUiState(
             today = today,
@@ -252,7 +272,36 @@ class HomeViewModel @Inject constructor(
             longtermATasks = orderedLongtermA,
             longtermBTasks = orderedLongtermB,
             selectedDateItems = selectedDateItems,
+            archivedDateItems = archivedDateItems,
         )
+    }
+
+    private fun buildArchivedDateItems(
+        content: HomeContent,
+        selected: LocalDate,
+    ): List<ArchivedRecordUi> {
+        val dailyKey = PeriodKey.daily(selected)
+        val weeklyKey = PeriodKey.weekly(selected)
+
+        return content.archived.flatMap { archived ->
+            val periodKey = when (archived.task.type) {
+                TaskType.DAILY -> dailyKey
+                TaskType.WEEKLY -> weeklyKey
+                else -> return@flatMap emptyList()
+            }
+            val completion = archived.completions.firstOrNull {
+                it.periodKey == periodKey && it.status != TaskStatus.PENDING
+            } ?: return@flatMap emptyList()
+            listOf(
+                ArchivedRecordUi(
+                    archiveId = archived.task.id,
+                    title = archived.task.shortText,
+                    type = archived.task.type,
+                    status = completion.status,
+                    periodKey = periodKey,
+                ),
+            )
+        }.sortedBy { it.title }
     }
 
     private fun buildSelectedDateItems(
@@ -290,13 +339,15 @@ class HomeViewModel @Inject constructor(
 
         val dailyRows = content.tasks
             .asSequence()
-            .filter { it.type == TaskType.DAILY }
-            .mapNotNull { task ->
-                val completion = completionIndex[task.id to dailyKey] ?: return@mapNotNull null
-                if (completion.status == TaskStatus.PENDING) return@mapNotNull null
+            .filter {
+                it.type == TaskType.DAILY &&
+                    (it.startAt == null || it.startAt <= dayEnd)
+            }
+            .map { task ->
+                val completion = completionIndex[task.id to dailyKey]
                 TaskRowUi(
                     task = task,
-                    status = completion.status,
+                    status = completion?.status ?: TaskStatus.PENDING,
                     periodKey = dailyKey,
                     historyKind = HistoryKind.DAILY,
                 )
@@ -306,13 +357,15 @@ class HomeViewModel @Inject constructor(
 
         val weeklyRows = content.tasks
             .asSequence()
-            .filter { it.type == TaskType.WEEKLY }
-            .mapNotNull { task ->
-                val completion = completionIndex[task.id to weeklyKey] ?: return@mapNotNull null
-                if (completion.status == TaskStatus.PENDING) return@mapNotNull null
+            .filter {
+                it.type == TaskType.WEEKLY &&
+                    (it.startAt == null || it.startAt <= dayEnd)
+            }
+            .map { task ->
+                val completion = completionIndex[task.id to weeklyKey]
                 TaskRowUi(
                     task = task,
-                    status = completion.status,
+                    status = completion?.status ?: TaskStatus.PENDING,
                     periodKey = weeklyKey,
                     historyKind = HistoryKind.WEEKLY,
                 )
@@ -327,6 +380,7 @@ class HomeViewModel @Inject constructor(
         val tasks: List<TaskEntity>,
         val completions: List<CompletionEntity>,
         val orders: List<TaskOrderEntity>,
+        val archived: List<ArchivedTaskWithCompletions>,
         val showNextWeek: Boolean,
     )
 }

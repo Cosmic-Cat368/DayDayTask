@@ -76,7 +76,7 @@ class DetailViewModel @Inject constructor(
 
     fun delete() {
         viewModelScope.launch {
-            taskRepository.softDelete(taskId)
+            taskRepository.deleteTaskPermanently(taskId)
         }
     }
 }

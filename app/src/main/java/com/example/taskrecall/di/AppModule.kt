@@ -3,6 +3,8 @@ package com.example.taskrecall.di
 import android.content.Context
 import androidx.room.Room
 import com.example.taskrecall.data.db.AppDatabase
+import com.example.taskrecall.data.db.ArchivedCompletionDao
+import com.example.taskrecall.data.db.ArchivedTaskDao
 import com.example.taskrecall.data.db.CompletionDao
 import com.example.taskrecall.data.db.TaskDao
 import com.example.taskrecall.data.db.TaskOrderDao
@@ -31,7 +33,7 @@ object AppModule {
             AppDatabase::class.java,
             AppDatabase.NAME,
         )
-            .addMigrations(AppDatabase.MIGRATION_1_2)
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3)
             .build()
 
     @Provides
@@ -42,4 +44,11 @@ object AppModule {
 
     @Provides
     fun provideTaskOrderDao(database: AppDatabase): TaskOrderDao = database.taskOrderDao()
+
+    @Provides
+    fun provideArchivedTaskDao(database: AppDatabase): ArchivedTaskDao = database.archivedTaskDao()
+
+    @Provides
+    fun provideArchivedCompletionDao(database: AppDatabase): ArchivedCompletionDao =
+        database.archivedCompletionDao()
 }

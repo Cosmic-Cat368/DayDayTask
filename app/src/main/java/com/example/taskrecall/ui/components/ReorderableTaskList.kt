@@ -1,5 +1,9 @@
 package com.example.taskrecall.ui.components
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
@@ -23,6 +27,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -68,6 +73,8 @@ fun <T> ReorderableTaskList(
     }
 
     val haptics = LocalHapticFeedback.current
+    val density = LocalDensity.current
+    val spacingPx = with(density) { 10.dp.toPx() }
 
     fun startDrag(id: Long) {
         if (draggingId != null) return
@@ -106,6 +113,27 @@ fun <T> ReorderableTaskList(
         dragOffsetY = 0f
     }
 
+    // 拖拽过程中计算目标插入位置，其它卡片据此实时避让。
+    val activeDragId = draggingId
+    val draggedIndex = if (activeDragId != null) {
+        localItems.indexOfFirst { itemKey(it) == activeDragId }
+    } else {
+        -1
+    }
+    val draggedBounds = activeDragId?.let { itemBounds[it] }
+    val targetIndex = if (activeDragId != null && draggedIndex >= 0 && draggedBounds != null) {
+        val draggedCenter = draggedBounds.top + draggedBounds.height / 2f + dragOffsetY
+        localItems
+            .filterIndexed { index, _ -> index != draggedIndex }
+            .count { other ->
+                val otherBounds = itemBounds[itemKey(other)] ?: return@count false
+                (otherBounds.top + otherBounds.height / 2f) < draggedCenter
+            }
+    } else {
+        -1
+    }
+    val shiftDistance = (draggedBounds?.height ?: 0f) + spacingPx
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -114,10 +142,32 @@ fun <T> ReorderableTaskList(
             },
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        localItems.forEach { item ->
+        localItems.forEachIndexed { index, item ->
             val id = itemKey(item)
             key(id) {
                 val isDragging = draggingId == id
+
+                // 目标位置在下方时，中间的卡片上移；目标位置在上方时，中间的卡片下移。
+                val avoidance = when {
+                    isDragging || targetIndex < 0 || draggedIndex < 0 -> 0f
+                    targetIndex > draggedIndex && index in (draggedIndex + 1)..targetIndex ->
+                        -shiftDistance
+                    targetIndex < draggedIndex && index in targetIndex until draggedIndex ->
+                        shiftDistance
+                    else -> 0f
+                }
+                val animatedAvoidance by animateFloatAsState(
+                    targetValue = avoidance,
+                    animationSpec = if (draggingId == null) {
+                        snap()
+                    } else {
+                        spring(
+                            stiffness = Spring.StiffnessMediumLow,
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                        )
+                    },
+                    label = "taskAvoidance",
+                )
 
                 val longPressModifier = Modifier.pointerInput(id) {
                     detectDragGesturesAfterLongPress(
@@ -162,7 +212,11 @@ fun <T> ReorderableTaskList(
                         .offset {
                             IntOffset(
                                 x = 0,
-                                y = if (isDragging) dragOffsetY.roundToInt() else 0,
+                                y = if (isDragging) {
+                                    dragOffsetY.roundToInt()
+                                } else {
+                                    animatedAvoidance.roundToInt()
+                                },
                             )
                         },
                 ) {

@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.IosShare
@@ -64,6 +65,7 @@ import com.example.taskrecall.BuildConfig
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     onBack: () -> Unit,
+    onOpenArchive: () -> Unit,
 ) {
     val showNextWeek by viewModel.showNextWeek.collectAsStateWithLifecycle()
     val isExporting by viewModel.isExporting.collectAsStateWithLifecycle()
@@ -200,6 +202,19 @@ fun SettingsScreen(
                             ),
                         )
                     },
+                )
+            }
+
+            SectionTitle("归档")
+
+            SettingsCard {
+                SettingsActionRow(
+                    icon = Icons.Default.Archive,
+                    title = "归档任务",
+                    subtitle = "查看已删除的日常/周常历史记录，只读保存",
+                    trailing = null,
+                    enabled = true,
+                    onClick = onOpenArchive,
                 )
             }
 

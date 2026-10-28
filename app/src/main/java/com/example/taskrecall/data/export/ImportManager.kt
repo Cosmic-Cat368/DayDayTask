@@ -4,6 +4,10 @@ import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
 import com.example.taskrecall.data.db.AppDatabase
+import com.example.taskrecall.data.db.ArchivedCompletionDao
+import com.example.taskrecall.data.db.ArchivedCompletionEntity
+import com.example.taskrecall.data.db.ArchivedTaskDao
+import com.example.taskrecall.data.db.ArchivedTaskEntity
 import com.example.taskrecall.data.db.CompletionDao
 import com.example.taskrecall.data.db.CompletionEntity
 import com.example.taskrecall.data.db.TaskDao
@@ -40,6 +44,8 @@ class ImportManager @Inject constructor(
     private val taskDao: TaskDao,
     private val completionDao: CompletionDao,
     private val taskOrderDao: TaskOrderDao,
+    private val archivedTaskDao: ArchivedTaskDao,
+    private val archivedCompletionDao: ArchivedCompletionDao,
     private val imageStorage: ImageStorage,
 ) {
 
@@ -79,14 +85,38 @@ class ImportManager @Inject constructor(
             val orders = backup.orders
                 .distinctBy { it.sectionKey to it.taskId }
                 .map { TaskOrderEntity(it.sectionKey, it.taskId, it.sortOrder) }
+            val archivedTasks = backup.archivedTasks.map {
+                ArchivedTaskEntity(
+                    id = it.id,
+                    sourceTaskId = it.sourceTaskId,
+                    type = it.type,
+                    shortText = it.shortText,
+                    createdAt = it.createdAt,
+                    rangeStart = it.rangeStart,
+                    rangeEnd = it.rangeEnd,
+                    archivedAt = it.archivedAt,
+                    deletedAt = it.deletedAt,
+                )
+            }
+            val archivedCompletions = backup.archivedCompletions
+                .distinctBy { it.archiveTaskId to it.periodKey }
+                .map {
+                    ArchivedCompletionEntity(it.archiveTaskId, it.periodKey, it.status)
+                }
 
             database.withTransaction {
                 completionDao.deleteAll()
                 taskOrderDao.deleteAll()
                 taskDao.deleteAll()
+                archivedCompletionDao.deleteAll()
+                archivedTaskDao.deleteAll()
                 if (tasks.isNotEmpty()) taskDao.insertAll(tasks)
                 if (completions.isNotEmpty()) completionDao.upsertAll(completions)
                 if (orders.isNotEmpty()) taskOrderDao.upsertAll(orders)
+                if (archivedTasks.isNotEmpty()) archivedTaskDao.insertAll(archivedTasks)
+                if (archivedCompletions.isNotEmpty()) {
+                    archivedCompletionDao.insertAll(archivedCompletions)
+                }
             }
 
             val stagedImages = File(staging, "images").takeIf { it.isDirectory }
@@ -167,6 +197,19 @@ class ImportManager @Inject constructor(
         }
         require(backup.orders.all { it.sectionKey.isNotBlank() }) {
             "备份中存在空的分区键"
+        }
+        require(backup.archivedTasks.map { it.id }.toSet().size == backup.archivedTasks.size) {
+            "备份中存在重复的归档 id"
+        }
+        require(backup.archivedTasks.all { it.shortText.isNotBlank() }) {
+            "备份中存在简写为空的归档任务"
+        }
+        val archiveIds = backup.archivedTasks.map { it.id }.toSet()
+        require(backup.archivedCompletions.all { it.archiveTaskId in archiveIds }) {
+            "备份中存在找不到对应归档任务的记录"
+        }
+        require(backup.archivedCompletions.all { it.periodKey.isNotBlank() }) {
+            "备份中存在空的归档周期键"
         }
     }
 

@@ -23,6 +23,9 @@ interface TaskOrderDao {
     @Query("DELETE FROM task_orders WHERE sectionKey = :sectionKey")
     suspend fun deleteSection(sectionKey: String)
 
+    @Query("DELETE FROM task_orders WHERE taskId = :taskId")
+    suspend fun deleteForTask(taskId: Long)
+
     @Query("DELETE FROM task_orders")
     suspend fun deleteAll()
 

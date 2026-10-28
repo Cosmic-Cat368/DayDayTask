@@ -20,6 +20,9 @@ data class BackupBundle(
     val completions: List<BackupCompletion>,
     /** v1.1 新增，旧备份没有该字段时默认为空。 */
     val orders: List<BackupOrder> = emptyList(),
+    /** v1.3 新增，旧备份没有该字段时默认为空。 */
+    val archivedTasks: List<BackupArchivedTask> = emptyList(),
+    val archivedCompletions: List<BackupArchivedCompletion> = emptyList(),
 ) {
     companion object {
         const val CURRENT_SCHEMA_VERSION = 1
@@ -51,6 +54,26 @@ data class BackupOrder(
     val sectionKey: String,
     val taskId: Long,
     val sortOrder: Int,
+)
+
+@Serializable
+data class BackupArchivedTask(
+    val id: Long,
+    val sourceTaskId: Long,
+    val type: TaskType,
+    val shortText: String,
+    val createdAt: Long,
+    val rangeStart: Long,
+    val rangeEnd: Long,
+    val archivedAt: Long,
+    val deletedAt: Long,
+)
+
+@Serializable
+data class BackupArchivedCompletion(
+    val archiveTaskId: Long,
+    val periodKey: String,
+    val status: TaskStatus,
 )
 
 data class ExportResult(

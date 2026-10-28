@@ -27,6 +27,12 @@ interface CompletionDao {
     @Query("SELECT * FROM completions WHERE taskId = :taskId")
     fun observeForTask(taskId: Long): Flow<List<CompletionEntity>>
 
+    @Query("SELECT * FROM completions WHERE taskId = :taskId")
+    suspend fun getAllForTask(taskId: Long): List<CompletionEntity>
+
+    @Query("DELETE FROM completions WHERE taskId = :taskId")
+    suspend fun deleteForTask(taskId: Long)
+
     @Query("SELECT * FROM completions WHERE taskId = :taskId AND periodKey = :periodKey")
     fun observeForPeriod(taskId: Long, periodKey: String): Flow<CompletionEntity?>
 

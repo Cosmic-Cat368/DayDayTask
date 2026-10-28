@@ -70,7 +70,7 @@ class AppDatabaseMigrationTest {
         legacy.close()
 
         val upgraded = Room.databaseBuilder(context, AppDatabase::class.java, dbName)
-            .addMigrations(AppDatabase.MIGRATION_1_2)
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3)
             .allowMainThreadQueries()
             .build()
 
@@ -82,6 +82,8 @@ class AppDatabaseMigrationTest {
             upgraded.completionDao().get(1, "once")?.status,
         )
         assertTrue(upgraded.taskOrderDao().getAll().isEmpty())
+        assertTrue(upgraded.archivedTaskDao().getAll().isEmpty())
+        assertTrue(upgraded.archivedCompletionDao().getAll().isEmpty())
 
         upgraded.close()
         context.deleteDatabase(dbName)

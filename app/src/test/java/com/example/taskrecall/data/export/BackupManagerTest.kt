@@ -4,6 +4,10 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.taskrecall.data.db.AppDatabase
+import com.example.taskrecall.data.db.ArchivedCompletionDao
+import com.example.taskrecall.data.db.ArchivedCompletionEntity
+import com.example.taskrecall.data.db.ArchivedTaskDao
+import com.example.taskrecall.data.db.ArchivedTaskEntity
 import com.example.taskrecall.data.db.CompletionDao
 import com.example.taskrecall.data.db.CompletionEntity
 import com.example.taskrecall.data.db.TaskDao
@@ -43,6 +47,8 @@ class BackupManagerTest {
     private lateinit var taskDao: TaskDao
     private lateinit var completionDao: CompletionDao
     private lateinit var taskOrderDao: TaskOrderDao
+    private lateinit var archivedTaskDao: ArchivedTaskDao
+    private lateinit var archivedCompletionDao: ArchivedCompletionDao
     private lateinit var imageStorage: ImageStorage
     private lateinit var exportManager: ExportManager
     private lateinit var importManager: ImportManager
@@ -59,14 +65,25 @@ class BackupManagerTest {
         taskDao = database.taskDao()
         completionDao = database.completionDao()
         taskOrderDao = database.taskOrderDao()
+        archivedTaskDao = database.archivedTaskDao()
+        archivedCompletionDao = database.archivedCompletionDao()
         imageStorage = ImageStorage(context)
-        exportManager = ExportManager(context, taskDao, completionDao, taskOrderDao, imageStorage)
+        exportManager = ExportManager(
+            context,
+            taskDao,
+            completionDao,
+            taskOrderDao,
+            archivedTaskDao,
+            imageStorage,
+        )
         importManager = ImportManager(
             context = context,
             database = database,
             taskDao = taskDao,
             completionDao = completionDao,
             taskOrderDao = taskOrderDao,
+            archivedTaskDao = archivedTaskDao,
+            archivedCompletionDao = archivedCompletionDao,
             imageStorage = imageStorage,
         )
     }
@@ -96,6 +113,21 @@ class BackupManagerTest {
         )
         completionDao.upsert(CompletionEntity(taskId, "once", TaskStatus.DONE))
         taskOrderDao.upsertAll(listOf(TaskOrderEntity("today", taskId, 0)))
+        val archiveId = archivedTaskDao.insert(
+            ArchivedTaskEntity(
+                sourceTaskId = 99,
+                type = TaskType.DAILY,
+                shortText = "已归档日常",
+                createdAt = 10,
+                rangeStart = 10,
+                rangeEnd = 20,
+                archivedAt = 30,
+                deletedAt = 30,
+            ),
+        )
+        archivedCompletionDao.insertAll(
+            listOf(ArchivedCompletionEntity(archiveId, "2026-10-20", TaskStatus.FAILED)),
+        )
 
         val exported = exportManager.exportToFile()
         assertTrue(exported.file.isFile)
@@ -127,6 +159,9 @@ class BackupManagerTest {
         assertEquals("带图片的任务", taskDao.getAllIncludingDeleted().first().shortText)
         assertEquals(TaskStatus.DONE, completionDao.get(taskId, "once")?.status)
         assertEquals("today", taskOrderDao.getAll().single().sectionKey)
+        val importedArchive = archivedTaskDao.getAllWithCompletions().single()
+        assertEquals("已归档日常", importedArchive.task.shortText)
+        assertEquals(TaskStatus.FAILED, importedArchive.completions.single().status)
         assertArrayEquals(imageBytes, File(imagesDir, "photo.jpg").readBytes())
         assertFalse(File(imagesDir, "old.jpg").exists())
     }

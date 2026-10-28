@@ -175,8 +175,18 @@ fun DetailScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("删除任务？") },
-            text = { Text("任务会从主页隐藏，但历史完成记录会保留。") },
+            title = { Text("永久删除任务？") },
+            text = {
+                val type = uiState.task?.type
+                Text(
+                    when (type) {
+                        TaskType.DAILY, TaskType.WEEKLY ->
+                            "任务会从数据库永久删除，无法恢复。今天/本周及未来的记录会删除；更早的完成/失败记录会移动到“设置 → 归档任务”。"
+                        else ->
+                            "任务及其完成记录会从数据库永久删除，无法恢复。"
+                    },
+                )
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -184,7 +194,7 @@ fun DetailScreen(
                         viewModel.delete()
                     },
                 ) {
-                    Text("删除", color = MaterialTheme.colorScheme.error)
+                    Text("永久删除", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {

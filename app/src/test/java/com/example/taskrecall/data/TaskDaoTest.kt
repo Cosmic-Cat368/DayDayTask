@@ -10,13 +10,18 @@ import com.example.taskrecall.data.db.TaskDao
 import com.example.taskrecall.data.db.TaskEntity
 import com.example.taskrecall.data.db.TaskOrderDao
 import com.example.taskrecall.data.db.TaskOrderEntity
+import com.example.taskrecall.data.repository.ImageStorage
+import com.example.taskrecall.data.repository.TaskRepository
 import com.example.taskrecall.domain.DateTimeUtils
+import com.example.taskrecall.domain.PeriodKey
 import com.example.taskrecall.domain.TaskStatus
 import com.example.taskrecall.domain.TaskType
 import java.time.LocalDate
+import java.time.LocalTime
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -175,6 +180,81 @@ class TaskDaoTest {
             taskOrderDao.getAll().any {
                 it.sectionKey == "daily" && it.taskId == taskA
             },
+        )
+    }
+
+    @Test
+    fun toggleStatusForPeriod_writesTheSelectedHistoryPeriodOnly() = runTest {
+        val taskId = insert(TaskType.DAILY, startAt = DateTimeUtils.startOfDay(today.minusDays(5)))
+        val task = taskDao.getById(taskId)!!
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val repository = TaskRepository(
+            database = database,
+            taskDao = taskDao,
+            completionDao = completionDao,
+            taskOrderDao = taskOrderDao,
+            archivedTaskDao = database.archivedTaskDao(),
+            archivedCompletionDao = database.archivedCompletionDao(),
+            imageStorage = ImageStorage(context),
+        )
+        val historyDate = today.minusDays(3)
+        val historyKey = PeriodKey.daily(historyDate)
+
+        repository.toggleStatusForPeriod(task, historyKey)
+
+        assertEquals(TaskStatus.DONE, completionDao.get(taskId, historyKey)?.status)
+        // 当前周期没有被误改。
+        assertNull(completionDao.get(taskId, PeriodKey.daily(today)))
+    }
+
+    @Test
+    fun hardDeleteDaily_archivesOnlyPastDoneOrFailedAndRemovesFuture() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val repo = TaskRepository(
+            database = database,
+            taskDao = taskDao,
+            completionDao = completionDao,
+            taskOrderDao = taskOrderDao,
+            archivedTaskDao = database.archivedTaskDao(),
+            archivedCompletionDao = database.archivedCompletionDao(),
+            imageStorage = ImageStorage(context),
+        )
+        val createdAt = DateTimeUtils.startOfDay(today.minusDays(5))
+        val taskId = taskDao.insert(
+            TaskEntity(
+                type = TaskType.DAILY,
+                shortText = "要删除的日常",
+                createdAt = createdAt,
+                startAt = createdAt,
+            ),
+        )
+        val keep1 = PeriodKey.daily(today.minusDays(3))
+        val keep2 = PeriodKey.daily(today.minusDays(2))
+        val todayKey = PeriodKey.daily(today)
+        val futureKey = PeriodKey.daily(today.plusDays(1))
+        completionDao.upsert(CompletionEntity(taskId, keep1, TaskStatus.DONE))
+        completionDao.upsert(CompletionEntity(taskId, keep2, TaskStatus.FAILED))
+        completionDao.upsert(CompletionEntity(taskId, todayKey, TaskStatus.DONE))
+        completionDao.upsert(CompletionEntity(taskId, futureKey, TaskStatus.DONE))
+        completionDao.upsert(CompletionEntity(taskId, PeriodKey.daily(today.minusDays(4)), TaskStatus.PENDING))
+        taskOrderDao.upsertAll(listOf(TaskOrderEntity("daily", taskId, 0)))
+
+        repo.deleteTaskPermanently(
+            taskId = taskId,
+            deletedAt = DateTimeUtils.atDateTime(today, LocalTime.NOON),
+        )
+
+        assertNull(taskDao.getById(taskId))
+        assertTrue(completionDao.getAllForTask(taskId).isEmpty())
+        assertTrue(taskOrderDao.getAll().none { it.taskId == taskId })
+
+        val archived = database.archivedTaskDao().getAllWithCompletions().single()
+        assertEquals("要删除的日常", archived.task.shortText)
+        assertEquals(DateTimeUtils.startOfDay(today.minusDays(5)), archived.task.rangeStart)
+        assertEquals(DateTimeUtils.startOfDay(today.minusDays(1)), archived.task.rangeEnd)
+        assertEquals(
+            setOf(keep1, keep2),
+            archived.completions.map { it.periodKey }.toSet(),
         )
     }
 

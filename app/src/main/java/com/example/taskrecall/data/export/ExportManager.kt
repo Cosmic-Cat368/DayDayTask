@@ -2,6 +2,7 @@ package com.example.taskrecall.data.export
 
 import android.content.Context
 import androidx.core.content.FileProvider
+import com.example.taskrecall.data.db.ArchivedTaskDao
 import com.example.taskrecall.data.db.CompletionDao
 import com.example.taskrecall.data.db.TaskDao
 import com.example.taskrecall.data.db.TaskOrderDao
@@ -41,6 +42,7 @@ class ExportManager @Inject constructor(
     private val taskDao: TaskDao,
     private val completionDao: CompletionDao,
     private val taskOrderDao: TaskOrderDao,
+    private val archivedTaskDao: ArchivedTaskDao,
     private val imageStorage: ImageStorage,
 ) {
 
@@ -78,6 +80,7 @@ class ExportManager @Inject constructor(
         val tasks = taskDao.getAllIncludingDeleted()
         val completions = completionDao.getAll()
         val orders = taskOrderDao.getAll()
+        val archivedTasks = archivedTaskDao.getAllWithCompletions()
         val completionIndex = completions.associateBy { it.taskId to it.periodKey }
 
         val backupTasks = tasks.map { task ->
@@ -106,6 +109,28 @@ class ExportManager @Inject constructor(
             },
             orders = orders.map {
                 BackupOrder(it.sectionKey, it.taskId, it.sortOrder)
+            },
+            archivedTasks = archivedTasks.map {
+                BackupArchivedTask(
+                    id = it.task.id,
+                    sourceTaskId = it.task.sourceTaskId,
+                    type = it.task.type,
+                    shortText = it.task.shortText,
+                    createdAt = it.task.createdAt,
+                    rangeStart = it.task.rangeStart,
+                    rangeEnd = it.task.rangeEnd,
+                    archivedAt = it.task.archivedAt,
+                    deletedAt = it.task.deletedAt,
+                )
+            },
+            archivedCompletions = archivedTasks.flatMap { task ->
+                task.completions.map {
+                    BackupArchivedCompletion(
+                        archiveTaskId = it.archiveTaskId,
+                        periodKey = it.periodKey,
+                        status = it.status,
+                    )
+                }
             },
         )
 

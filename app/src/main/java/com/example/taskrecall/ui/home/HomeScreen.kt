@@ -76,6 +76,7 @@ fun HomeScreen(
     onNextMonth: () -> Unit,
     onGoToday: () -> Unit,
     onToggleTask: (com.example.taskrecall.data.db.TaskEntity) -> Unit,
+    onToggleSelectedDateTask: (TaskRowUi) -> Unit,
     onOpenTask: (Long) -> Unit,
     onAddTask: (LocalDate) -> Unit,
     onReorderTasks: (String, List<Long>) -> Unit,
@@ -164,7 +165,7 @@ fun HomeScreen(
                     containerColor = MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.primary,
                 ) {
-                    listOf(taskTabLabel, "日常", "周常", "长期任务").forEachIndexed { index, label ->
+                    listOf(taskTabLabel, "长期任务", "日常", "周常").forEachIndexed { index, label ->
                         Tab(
                             selected = selectedTab == index,
                             onClick = { switchToTab(index) },
@@ -196,6 +197,7 @@ fun HomeScreen(
                         nextWeekCollapsed = nextWeekCollapsed,
                         onToggleNextWeek = { nextWeekCollapsed = !nextWeekCollapsed },
                         onToggleTask = onToggleTask,
+                        onToggleSelectedDateTask = onToggleSelectedDateTask,
                         onOpenTask = onOpenTask,
                         onReorderTasks = onReorderTasks,
                         onGoToday = handleGoToday,
@@ -233,6 +235,7 @@ private fun TasksTabPage(
     nextWeekCollapsed: Boolean,
     onToggleNextWeek: () -> Unit,
     onToggleTask: (com.example.taskrecall.data.db.TaskEntity) -> Unit,
+    onToggleSelectedDateTask: (TaskRowUi) -> Unit,
     onOpenTask: (Long) -> Unit,
     onReorderTasks: (String, List<Long>) -> Unit,
     onGoToday: () -> Unit,
@@ -348,23 +351,38 @@ private fun TasksTabPage(
                 }
             }
         } else {
+            val canEditHistory = uiState.selectedDate < uiState.today
             item(key = "selected_date_header") {
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    Text(
-                        text = DateTimeUtils.formatFullDate(uiState.selectedDate),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextButton(onClick = onGoToday) {
-                        Text("回到今天")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = DateTimeUtils.formatFullDate(uiState.selectedDate),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = onGoToday) {
+                            Text("回到今天")
+                        }
                     }
+                    Text(
+                        text = if (canEditHistory) {
+                            "历史记录可直接点击圆点修改状态"
+                        } else {
+                            "未来日期视图只读"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
-            if (uiState.selectedDateItems.isEmpty()) {
+            if (uiState.selectedDateItems.isEmpty() && uiState.archivedDateItems.isEmpty()) {
                 item(key = "selected_date_empty") {
                     EmptyHint("这一天没有任务或日常/周常记录")
                 }
@@ -379,10 +397,36 @@ private fun TasksTabPage(
                         status = row.status,
                         metaText = selectedDateMeta(row),
                         onOpen = { onOpenTask(row.task.id) },
-                        onToggle = {},
-                        statusEnabled = false,
+                        onToggle = {
+                            if (canEditHistory) onToggleSelectedDateTask(row)
+                        },
+                        statusEnabled = canEditHistory,
                         trailingText = row.status.displayName(),
                     )
+                }
+                if (uiState.archivedDateItems.isNotEmpty()) {
+                    item(key = "archived_date_header") {
+                        SubSectionHeader("已归档")
+                    }
+                    items(
+                        uiState.archivedDateItems,
+                        key = { "archived_${it.archiveId}_${it.periodKey}" },
+                    ) { archived ->
+                        TaskCard(
+                            title = archived.title,
+                            type = archived.type,
+                            status = archived.status,
+                            metaText = when (archived.type) {
+                                TaskType.DAILY -> "日常 · 已删除归档"
+                                TaskType.WEEKLY -> "周常 · 已删除归档"
+                                else -> "已删除归档"
+                            },
+                            onOpen = {},
+                            onToggle = {},
+                            statusEnabled = false,
+                            trailingText = archived.status.displayName(),
+                        )
+                    }
                 }
             }
         }
@@ -566,9 +610,9 @@ private fun LongtermTabPage(
 }
 
 private const val TAB_TASKS = 0
-private const val TAB_DAILY = 1
-private const val TAB_WEEKLY = 2
-private const val TAB_LONGTERM = 3
+private const val TAB_LONGTERM = 1
+private const val TAB_DAILY = 2
+private const val TAB_WEEKLY = 3
 private const val TAB_COUNT = 4
 
 private val PAGE_PADDING = PaddingValues(

@@ -40,6 +40,22 @@ class BackupSerializationTest {
             orders = listOf(
                 BackupOrder("today", 7, 0),
             ),
+            archivedTasks = listOf(
+                BackupArchivedTask(
+                    id = 1,
+                    sourceTaskId = 8,
+                    type = TaskType.DAILY,
+                    shortText = "已归档日常",
+                    createdAt = 10,
+                    rangeStart = 20,
+                    rangeEnd = 30,
+                    archivedAt = 40,
+                    deletedAt = 40,
+                ),
+            ),
+            archivedCompletions = listOf(
+                BackupArchivedCompletion(1, "2026-10-20", TaskStatus.FAILED),
+            ),
         )
 
         val encoded = json.encodeToString(backup)
