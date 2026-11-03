@@ -37,6 +37,7 @@ import java.time.LocalDate
  * 路由：
  * - home
  * - add?date=yyyy-MM-dd（日期可选，用于“先选日期再添加”）
+ * - edit/{taskId}（编辑已有任务）
  * - detail/{taskId}
  * - settings
  */
@@ -100,6 +101,19 @@ fun TaskRecallApp(
         }
 
         composable(
+            route = "edit/{taskId}",
+            arguments = listOf(
+                navArgument("taskId") { type = NavType.LongType },
+            ),
+        ) {
+            AddTaskScreen(
+                viewModel = hiltViewModel(),
+                onBack = { navController.popBackStack() },
+                onSaved = { navController.popBackStack() },
+            )
+        }
+
+        composable(
             route = "detail/{taskId}",
             arguments = listOf(
                 navArgument("taskId") { type = NavType.LongType },
@@ -108,6 +122,9 @@ fun TaskRecallApp(
             DetailScreen(
                 viewModel = hiltViewModel(),
                 onBack = { navController.popBackStack() },
+                onEdit = { taskId ->
+                    navController.navigate("edit/$taskId")
+                },
             )
         }
 

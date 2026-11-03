@@ -26,10 +26,10 @@ sealed interface SaveState {
 }
 
 /**
- * 添加任务 ViewModel。
+ * 添加 / 编辑任务 ViewModel。
  *
- * 规格八：日期可预填、可改。预填日期来自主页选中的日期。
- * 规格十六：图片入库前复制到私有目录，Markdown 里只写相对路径。
+ * 路由带 taskId 时进入编辑模式：加载原任务，保存时更新而不是新增。
+ * 为避免破坏已有完成记录，编辑模式下任务类型不可修改。
  */
 @HiltViewModel
 class AddTaskViewModel @Inject constructor(
@@ -38,12 +38,27 @@ class AddTaskViewModel @Inject constructor(
     private val imageStorage: ImageStorage,
 ) : ViewModel() {
 
+    private val editingTaskId: Long? = savedStateHandle.get<Long>("taskId")
+
+    val isEditing: Boolean = editingTaskId != null
+
+    private val _editingTask = MutableStateFlow<TaskEntity?>(null)
+    val editingTask: StateFlow<TaskEntity?> = _editingTask.asStateFlow()
+
     val prefillDate: LocalDate = runCatching {
         savedStateHandle.get<String>("date")?.let(LocalDate::parse)
     }.getOrNull() ?: LocalDate.now()
 
     private val _saveState = MutableStateFlow<SaveState>(SaveState.Idle)
     val saveState: StateFlow<SaveState> = _saveState.asStateFlow()
+
+    init {
+        if (editingTaskId != null) {
+            viewModelScope.launch {
+                _editingTask.value = taskRepository.getTask(editingTaskId)
+            }
+        }
+    }
 
     fun save(
         type: TaskType,
@@ -60,8 +75,14 @@ class AddTaskViewModel @Inject constructor(
             return
         }
 
-        val now = System.currentTimeMillis()
-        val dueAt = when (type) {
+        val existing = _editingTask.value
+        if (isEditing && existing == null) {
+            _saveState.value = SaveState.Error("任务不存在或已被删除")
+            return
+        }
+
+        val effectiveType = existing?.type ?: type
+        val dueAt = when (effectiveType) {
             TaskType.SINGLE,
             TaskType.LONGTERM_A,
             -> DateTimeUtils.atDateTime(dueDate, dueTime)
@@ -72,15 +93,21 @@ class AddTaskViewModel @Inject constructor(
             TaskType.WEEKLY,
             -> null
         }
-        val startAt = when (type) {
+        val startAt = when (effectiveType) {
             TaskType.DAILY -> DateTimeUtils.startOfDay(startDate)
             // 周常的起始周按 ISO 周首周一存储。
             TaskType.WEEKLY -> DateTimeUtils.startOfDay(DateTimeUtils.startOfWeek(startDate))
             else -> null
         }
 
-        val task = TaskEntity(
-            type = type,
+        val now = System.currentTimeMillis()
+        val task = existing?.copy(
+            shortText = title,
+            detailMarkdown = detailMarkdown.trim().ifBlank { null },
+            dueAt = dueAt,
+            startAt = startAt,
+        ) ?: TaskEntity(
+            type = effectiveType,
             shortText = title,
             detailMarkdown = detailMarkdown.trim().ifBlank { null },
             createdAt = now,
@@ -90,7 +117,13 @@ class AddTaskViewModel @Inject constructor(
 
         _saveState.value = SaveState.Saving
         viewModelScope.launch {
-            runCatching { taskRepository.addTask(task) }
+            runCatching {
+                if (existing != null) {
+                    taskRepository.updateTask(task)
+                } else {
+                    taskRepository.addTask(task)
+                }
+            }
                 .onSuccess { _saveState.value = SaveState.Saved }
                 .onFailure { throwable ->
                     _saveState.value = SaveState.Error(
@@ -102,8 +135,6 @@ class AddTaskViewModel @Inject constructor(
 
     /**
      * 复制图片并返回 Markdown 相对路径；失败返回 null。
-     * 立即复制的好处是实现最简单；代价是用户放弃编辑时可能留下未引用图片。
-     * 规格未要求清理孤儿图片，这里在注释中说明。
      */
     suspend fun importImage(uri: Uri): String? = imageStorage.importImage(uri)
 

@@ -208,6 +208,35 @@ class TaskDaoTest {
     }
 
     @Test
+    fun historyCycle_goesDoneFailedEmpty() = runTest {
+        val taskId = insert(TaskType.DAILY, startAt = DateTimeUtils.startOfDay(today.minusDays(5)))
+        val task = taskDao.getById(taskId)!!
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val repository = TaskRepository(
+            database = database,
+            taskDao = taskDao,
+            completionDao = completionDao,
+            taskOrderDao = taskOrderDao,
+            archivedTaskDao = database.archivedTaskDao(),
+            archivedCompletionDao = database.archivedCompletionDao(),
+            imageStorage = ImageStorage(context),
+        )
+        val key = PeriodKey.daily(today.minusDays(3))
+
+        assertEquals(TaskStatus.DONE, repository.cycleHistoryStatus(task, key))
+        assertEquals(TaskStatus.DONE, completionDao.get(taskId, key)?.status)
+
+        assertEquals(TaskStatus.FAILED, repository.cycleHistoryStatus(task, key))
+        assertEquals(TaskStatus.FAILED, completionDao.get(taskId, key)?.status)
+
+        assertEquals(TaskStatus.PENDING, repository.cycleHistoryStatus(task, key))
+        assertNull(completionDao.get(taskId, key))
+
+        assertEquals(TaskStatus.DONE, repository.cycleHistoryStatus(task, key))
+        assertEquals(TaskStatus.DONE, completionDao.get(taskId, key)?.status)
+    }
+
+    @Test
     fun hardDeleteDaily_archivesOnlyPastDoneOrFailedAndRemovesFuture() = runTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val repo = TaskRepository(

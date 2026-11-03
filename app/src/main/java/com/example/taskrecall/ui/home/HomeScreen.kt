@@ -54,6 +54,7 @@ import com.example.taskrecall.ui.components.ReorderableTaskList
 import com.example.taskrecall.ui.components.TaskCard
 import com.example.taskrecall.ui.components.TaskRecallCalendar
 import com.example.taskrecall.ui.components.displayName
+import com.example.taskrecall.ui.components.historyDisplayName
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 
@@ -373,7 +374,7 @@ private fun TasksTabPage(
                     }
                     Text(
                         text = if (canEditHistory) {
-                            "历史记录可直接点击圆点修改状态"
+                            "历史记录：圆点按“做了 → 没做 → 空状态”循环"
                         } else {
                             "未来日期视图只读"
                         },
@@ -401,7 +402,7 @@ private fun TasksTabPage(
                             if (canEditHistory) onToggleSelectedDateTask(row)
                         },
                         statusEnabled = canEditHistory,
-                        trailingText = row.status.displayName(),
+                        trailingText = row.status.historyDisplayName(),
                     )
                 }
                 if (uiState.archivedDateItems.isNotEmpty()) {
@@ -424,7 +425,7 @@ private fun TasksTabPage(
                             onOpen = {},
                             onToggle = {},
                             statusEnabled = false,
-                            trailingText = archived.status.displayName(),
+                            trailingText = archived.status.historyDisplayName(),
                         )
                     }
                 }

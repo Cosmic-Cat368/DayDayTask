@@ -110,7 +110,7 @@ class HomeViewModel @Inject constructor(
         // 只允许修改过去日期；未来日期保持只读。
         if (selectedDate.value >= today) return
         viewModelScope.launch {
-            taskRepository.toggleStatusForPeriod(row.task, row.periodKey)
+            taskRepository.cycleHistoryStatus(row.task, row.periodKey)
         }
     }
 
@@ -248,7 +248,7 @@ class HomeViewModel @Inject constructor(
             .toSet()
 
         val selectedDateItems = if (selected != today) {
-            buildSelectedDateItems(content, selected, currentConsumptions, currentTime)
+            buildSelectedDateItems(content, selected, currentConsumptions)
         } else {
             emptyList()
         }
@@ -308,7 +308,6 @@ class HomeViewModel @Inject constructor(
         content: HomeContent,
         selected: LocalDate,
         completionIndex: Map<Pair<Long, String>, CompletionEntity>,
-        currentTime: Long,
     ): List<TaskRowUi> {
         val dayStart = DateTimeUtils.startOfDay(selected)
         val dayEnd = DateTimeUtils.endOfDay(selected)
@@ -326,11 +325,11 @@ class HomeViewModel @Inject constructor(
             .map { task ->
                 TaskRowUi(
                     task = task,
-                    status = StatusResolver.displayStatus(
-                        task = task,
-                        completion = completionIndex[task.id to PeriodKey.ONCE],
-                        now = currentTime,
-                    ),
+                    // 历史视图不把逾期动态成失败；没有记录就是空状态。
+                    status = completionIndex[task.id to PeriodKey.ONCE]
+                        ?.status
+                        ?.takeIf { it != TaskStatus.PENDING }
+                        ?: TaskStatus.PENDING,
                     periodKey = PeriodKey.ONCE,
                     historyKind = HistoryKind.DUE,
                 )

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -63,6 +65,7 @@ import com.example.taskrecall.ui.components.displayName
 fun DetailScreen(
     viewModel: DetailViewModel,
     onBack: () -> Unit,
+    onEdit: (Long) -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -86,7 +89,13 @@ fun DetailScreen(
                     }
                 },
                 actions = {
-                    if (uiState.task != null) {
+                    uiState.task?.let { task ->
+                        IconButton(onClick = { onEdit(task.id) }) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "编辑任务",
+                            )
+                        }
                         IconButton(onClick = { showDeleteConfirm = true }) {
                             Icon(
                                 imageVector = Icons.Default.DeleteOutline,
@@ -145,10 +154,34 @@ fun DetailScreen(
                 ) {
                     Column(
                         modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        MetaRow("时间", timeText(task))
-                        MetaRow("创建", DateTimeUtils.formatFullDate(task.createdAt))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            Text(
+                                text = "时间",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .width(44.dp)
+                                    .padding(top = 2.dp),
+                            )
+                            Text(
+                                text = timeText(task),
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        Text(
+                            text = "创建 ${DateTimeUtils.formatFullDate(task.createdAt)} ${
+                                DateTimeUtils.formatTime(task.createdAt)
+                            }",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.align(Alignment.End),
+                        )
                     }
                 }
 
@@ -207,22 +240,6 @@ fun DetailScreen(
 }
 
 @Composable
-private fun MetaRow(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(end = 12.dp),
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-    }
-}
-
-@Composable
 private fun TypePill(type: TaskType) {
     Surface(
         shape = RoundedCornerShape(8.dp),
@@ -275,24 +292,24 @@ private fun StatusPill(status: TaskStatus) {
 private fun timeText(task: TaskEntity): String {
     return when (task.type) {
         TaskType.SINGLE -> task.dueAt?.let {
-            "到期 ${DateTimeUtils.formatFullDate(it)} ${
+            "${DateTimeUtils.formatFullDate(it)} ${
                 if (DateTimeUtils.isDateOnly(it)) "全天" else DateTimeUtils.formatTime(it)
             }"
-        } ?: "未设置日期"
+        } ?: "未设置时间"
 
         TaskType.LONGTERM_A -> task.dueAt?.let {
-            "截止 ${DateTimeUtils.formatFullDate(it)} ${
+            "${DateTimeUtils.formatFullDate(it)} ${
                 if (DateTimeUtils.isDateOnly(it)) "全天" else DateTimeUtils.formatTime(it)
             }"
         } ?: "未设置截止时间"
 
-        TaskType.LONGTERM_B -> "无时限目标"
+        TaskType.LONGTERM_B -> "无时限"
         TaskType.DAILY -> task.startAt?.let {
-            "起始 ${DateTimeUtils.formatFullDate(it)} · 每天"
+            "${DateTimeUtils.formatFullDate(it)} 起"
         } ?: "每天"
 
         TaskType.WEEKLY -> task.startAt?.let {
-            "起始周 ${DateTimeUtils.formatFullDate(it)} · 每周一重置"
-        } ?: "每周一重置"
+            "${DateTimeUtils.formatFullDate(it)} 起"
+        } ?: "每周"
     }
 }

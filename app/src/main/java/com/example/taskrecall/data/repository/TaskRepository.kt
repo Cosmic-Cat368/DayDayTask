@@ -60,6 +60,8 @@ class TaskRepository @Inject constructor(
 
     suspend fun addTask(task: TaskEntity): Long = taskDao.insert(task)
 
+    suspend fun updateTask(task: TaskEntity) = taskDao.update(task)
+
     suspend fun softDelete(taskId: Long, deletedAt: Long = System.currentTimeMillis()) {
         taskDao.softDelete(taskId, deletedAt)
     }
@@ -159,6 +161,30 @@ class TaskRepository @Inject constructor(
             ),
         )
         return next
+    }
+
+    /**
+     * 历史日期的三态循环：做了 -> 没做 -> 空状态 -> 做了。
+     * 空状态会真正删除该周期的完成记录，而不是写入 PENDING。
+     */
+    suspend fun cycleHistoryStatus(task: TaskEntity, periodKey: String): TaskStatus {
+        val current = completionDao.get(task.id, periodKey)
+        return when (current?.status) {
+            null, TaskStatus.PENDING -> {
+                completionDao.upsert(CompletionEntity(task.id, periodKey, TaskStatus.DONE))
+                TaskStatus.DONE
+            }
+
+            TaskStatus.DONE -> {
+                completionDao.upsert(CompletionEntity(task.id, periodKey, TaskStatus.FAILED))
+                TaskStatus.FAILED
+            }
+
+            TaskStatus.FAILED -> {
+                completionDao.delete(task.id, periodKey)
+                TaskStatus.PENDING
+            }
+        }
     }
 
     suspend fun setStatus(taskId: Long, periodKey: String, status: TaskStatus) {

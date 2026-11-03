@@ -4,19 +4,23 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 /**
  * 规格十：TaskDao。
  *
  * 今日区、近一周区、长期 A/B、日常、周常查询都使用 deletedAt IS NULL。
- * 删除使用 update deletedAt，而不是 DELETE。
+ * 任务编辑使用 update；删除使用物理 DELETE。
  */
 @Dao
 interface TaskDao {
 
     @Insert
     suspend fun insert(task: TaskEntity): Long
+
+    @Update
+    suspend fun update(task: TaskEntity)
 
     /** 导入覆盖时保留原 id，供 CompletionEntity 关联。 */
     @Insert(onConflict = OnConflictStrategy.REPLACE)

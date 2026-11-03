@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -37,7 +36,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -64,11 +62,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.taskrecall.domain.DateTimeUtils
 import com.example.taskrecall.domain.TaskType
-import com.example.taskrecall.ui.components.description
 import com.example.taskrecall.ui.components.displayName
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.Locale
 import kotlinx.coroutines.launch
@@ -96,6 +94,7 @@ fun AddTaskScreen(
     var hasTime by rememberSaveable { mutableStateOf(false) }
     var hour by rememberSaveable { mutableIntStateOf(9) }
     var minute by rememberSaveable { mutableIntStateOf(0) }
+    var formInitialized by rememberSaveable { mutableStateOf(!viewModel.isEditing) }
 
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -104,8 +103,34 @@ fun AddTaskScreen(
     val dueDate = LocalDate.parse(dueDateText)
     val startDate = LocalDate.parse(startDateText)
     val saveState by viewModel.saveState.collectAsStateWithLifecycle()
+    val editingTask by viewModel.editingTask.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(editingTask) {
+        val task = editingTask ?: return@LaunchedEffect
+        if (formInitialized) return@LaunchedEffect
+
+        type = task.type
+        shortText = task.shortText
+        detailField = TextFieldValue(task.detailMarkdown.orEmpty())
+        task.dueAt?.let { dueAt ->
+            val zoned = Instant.ofEpochMilli(dueAt).atZone(ZoneId.systemDefault())
+            dueDateText = zoned.toLocalDate().toString()
+            hasTime = !DateTimeUtils.isDateOnly(dueAt)
+            if (hasTime) {
+                hour = zoned.hour
+                minute = zoned.minute
+            }
+        }
+        task.startAt?.let { startAt ->
+            startDateText = Instant.ofEpochMilli(startAt)
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate()
+                .toString()
+        }
+        formInitialized = true
+    }
 
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
@@ -146,7 +171,7 @@ fun AddTaskScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("添加任务") },
+                title = { Text(if (viewModel.isEditing) "编辑任务" else "添加任务") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -175,6 +200,7 @@ fun AddTaskScreen(
                                     startDate = startDate,
                                 )
                             },
+                            enabled = formInitialized,
                         ) {
                             Text("保存", fontWeight = FontWeight.SemiBold)
                         }
@@ -210,21 +236,10 @@ fun AddTaskScreen(
                     FilterChip(
                         selected = type == option,
                         onClick = { type = option },
+                        enabled = !viewModel.isEditing,
                         label = { Text(option.displayName()) },
                     )
                 }
-            }
-
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
-            ) {
-                Text(
-                    text = type.description(),
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                )
             }
 
             OutlinedTextField(
@@ -268,34 +283,16 @@ fun AddTaskScreen(
                     )
                 }
 
-                if (type == TaskType.WEEKLY) {
-                    Text(
-                        text = "周常按 ISO 周统计，周一为一周开始。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
                 if (type == TaskType.SINGLE || type == TaskType.LONGTERM_A) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "设置具体时间",
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
-                            Text(
-                                text = if (hasTime) {
-                                    String.format(Locale.UK, "%02d:%02d", hour, minute)
-                                } else {
-                                    "不设置时间时，按当天结束前完成"
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                        Text(
+                            text = "设置具体时间",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f),
+                        )
                         Switch(
                             checked = hasTime,
                             onCheckedChange = { hasTime = it },
@@ -349,12 +346,6 @@ fun AddTaskScreen(
                 label = { Text("可写 Markdown，图片使用相对路径") },
                 placeholder = { Text("支持标题、列表、粗体、链接和图片…") },
                 textStyle = MaterialTheme.typography.bodyMedium,
-            )
-
-            Text(
-                text = "图片会被复制到应用私有目录，Markdown 中只保存 images/ 相对路径。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             Spacer(modifier = Modifier.height(24.dp))

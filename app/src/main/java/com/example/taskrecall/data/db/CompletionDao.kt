@@ -33,6 +33,9 @@ interface CompletionDao {
     @Query("DELETE FROM completions WHERE taskId = :taskId")
     suspend fun deleteForTask(taskId: Long)
 
+    @Query("DELETE FROM completions WHERE taskId = :taskId AND periodKey = :periodKey")
+    suspend fun delete(taskId: Long, periodKey: String)
+
     @Query("SELECT * FROM completions WHERE taskId = :taskId AND periodKey = :periodKey")
     fun observeForPeriod(taskId: Long, periodKey: String): Flow<CompletionEntity?>
 

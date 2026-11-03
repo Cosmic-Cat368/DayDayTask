@@ -26,3 +26,10 @@ fun TaskStatus.displayName(): String = when (this) {
     TaskStatus.DONE -> "已完成"
     TaskStatus.FAILED -> "未完成（失败）"
 }
+
+/** 历史日期只有三种展示状态；PENDING 在这里代表“没有记录”。 */
+fun TaskStatus.historyDisplayName(): String = when (this) {
+    TaskStatus.DONE -> "做了"
+    TaskStatus.FAILED -> "没做"
+    TaskStatus.PENDING -> "空状态"
+}
