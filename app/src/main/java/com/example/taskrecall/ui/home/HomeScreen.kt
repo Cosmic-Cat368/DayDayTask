@@ -53,8 +53,6 @@ import com.example.taskrecall.domain.TaskType
 import com.example.taskrecall.ui.components.ReorderableTaskList
 import com.example.taskrecall.ui.components.TaskCard
 import com.example.taskrecall.ui.components.TaskRecallCalendar
-import com.example.taskrecall.ui.components.displayName
-import com.example.taskrecall.ui.components.historyDisplayName
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 
@@ -263,14 +261,9 @@ private fun TasksTabPage(
                     ) { row, cardModifier, handleModifier, isDragging ->
                         TaskCard(
                             title = row.task.shortText,
-                            type = row.task.type,
                             status = row.status,
                             metaText = row.task.dueAt?.let { due ->
-                                if (row.task.type == TaskType.LONGTERM_A) {
-                                    "截止 ${DateTimeUtils.formatTodayDue(due)}"
-                                } else {
-                                    DateTimeUtils.formatTodayDue(due)
-                                }
+                                "截止 ${DateTimeUtils.formatMonthDayTime(due)}"
                             },
                             onOpen = { onOpenTask(row.task.id) },
                             onToggle = { onToggleTask(row.task) },
@@ -335,10 +328,9 @@ private fun TasksTabPage(
                             ) { row, cardModifier, handleModifier, isDragging ->
                                 TaskCard(
                                     title = row.task.shortText,
-                                    type = row.task.type,
                                     status = row.status,
                                     metaText = row.task.dueAt?.let {
-                                        "截止 ${DateTimeUtils.formatNextWeekDue(it)}"
+                                        "截止 ${DateTimeUtils.formatMonthDayTime(it)}"
                                     },
                                     onOpen = { onOpenTask(row.task.id) },
                                     onToggle = { onToggleTask(row.task) },
@@ -372,15 +364,6 @@ private fun TasksTabPage(
                             Text("回到今天")
                         }
                     }
-                    Text(
-                        text = if (canEditHistory) {
-                            "历史记录：圆点按“做了 → 没做 → 空状态”循环"
-                        } else {
-                            "未来日期视图只读"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
             if (uiState.selectedDateItems.isEmpty() && uiState.archivedDateItems.isEmpty()) {
@@ -394,7 +377,6 @@ private fun TasksTabPage(
                 ) { row ->
                     TaskCard(
                         title = row.task.shortText,
-                        type = row.task.type,
                         status = row.status,
                         metaText = selectedDateMeta(row),
                         onOpen = { onOpenTask(row.task.id) },
@@ -402,7 +384,6 @@ private fun TasksTabPage(
                             if (canEditHistory) onToggleSelectedDateTask(row)
                         },
                         statusEnabled = canEditHistory,
-                        trailingText = row.status.historyDisplayName(),
                     )
                 }
                 if (uiState.archivedDateItems.isNotEmpty()) {
@@ -415,7 +396,6 @@ private fun TasksTabPage(
                     ) { archived ->
                         TaskCard(
                             title = archived.title,
-                            type = archived.type,
                             status = archived.status,
                             metaText = when (archived.type) {
                                 TaskType.DAILY -> "日常 · 已删除归档"
@@ -425,7 +405,6 @@ private fun TasksTabPage(
                             onOpen = {},
                             onToggle = {},
                             statusEnabled = false,
-                            trailingText = archived.status.historyDisplayName(),
                         )
                     }
                 }
@@ -466,7 +445,6 @@ private fun DailyTabPage(
                 ) { row, cardModifier, handleModifier, isDragging ->
                     TaskCard(
                         title = row.task.shortText,
-                        type = row.task.type,
                         status = row.status,
                         metaText = "每天",
                         onOpen = { onOpenTask(row.task.id) },
@@ -513,7 +491,6 @@ private fun WeeklyTabPage(
                 ) { row, cardModifier, handleModifier, isDragging ->
                     TaskCard(
                         title = row.task.shortText,
-                        type = row.task.type,
                         status = row.status,
                         metaText = "每周一重新开始",
                         onOpen = { onOpenTask(row.task.id) },
@@ -564,7 +541,6 @@ private fun LongtermTabPage(
                 ) { row, cardModifier, handleModifier, isDragging ->
                     TaskCard(
                         title = row.task.shortText,
-                        type = row.task.type,
                         status = row.status,
                         metaText = row.task.dueAt?.let {
                             "截止 ${DateTimeUtils.formatMonthDay(it)}"
@@ -595,7 +571,6 @@ private fun LongtermTabPage(
                 ) { row, cardModifier, handleModifier, isDragging ->
                     TaskCard(
                         title = row.task.shortText,
-                        type = row.task.type,
                         status = row.status,
                         metaText = "目标",
                         onOpen = { onOpenTask(row.task.id) },

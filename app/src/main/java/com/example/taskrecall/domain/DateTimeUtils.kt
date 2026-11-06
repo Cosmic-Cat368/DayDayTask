@@ -74,6 +74,16 @@ object DateTimeUtils {
     fun formatMonthDay(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): String =
         toLocalDate(epochMillis, zoneId).format(DateTimeFormatter.ofPattern("M月d日", Locale.CHINA))
 
+    /** 截止日期简写：日期 + 有具体时间时的时间。 */
+    fun formatMonthDayTime(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): String {
+        val date = formatMonthDay(epochMillis, zoneId)
+        return if (isDateOnly(epochMillis, zoneId)) {
+            date
+        } else {
+            "$date ${formatTime(epochMillis, zoneId)}"
+        }
+    }
+
     fun formatFullDate(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): String =
         toLocalDate(epochMillis, zoneId).format(DateTimeFormatter.ofPattern("yyyy年M月d日", Locale.CHINA))
 

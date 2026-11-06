@@ -18,7 +18,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -29,7 +28,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.taskrecall.domain.TaskStatus
-import com.example.taskrecall.domain.TaskType
 
 /**
  * 统一任务卡片。
@@ -40,14 +38,12 @@ import com.example.taskrecall.domain.TaskType
 @Composable
 fun TaskCard(
     title: String,
-    type: TaskType,
     status: TaskStatus,
     metaText: String?,
     onOpen: () -> Unit,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
     statusEnabled: Boolean = true,
-    trailingText: String? = null,
     /** 传入后右侧显示三条杠拖动手柄；历史区传 null。 */
     dragHandleModifier: Modifier? = null,
     /** 正在被拖动时使用高亮颜色和圆角阴影，避免出现白色方块。 */
@@ -112,30 +108,15 @@ fun TaskCard(
                     overflow = TextOverflow.Ellipsis,
                 )
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    TypeBadge(type = type, muted = finished && !isDragging)
-                    if (!metaText.isNullOrBlank()) {
-                        Text(
-                            text = metaText,
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = contentColor.copy(alpha = 0.75f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                if (!metaText.isNullOrBlank()) {
+                    Text(
+                        text = metaText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = contentColor.copy(alpha = 0.75f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
-            }
-
-            if (!trailingText.isNullOrBlank()) {
-                Text(
-                    text = trailingText,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = contentColor.copy(alpha = 0.7f),
-                )
             }
 
             if (dragHandleModifier != null) {
@@ -155,30 +136,5 @@ fun TaskCard(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun TypeBadge(type: TaskType, muted: Boolean) {
-    val background = if (muted) {
-        MaterialTheme.colorScheme.surfaceVariant
-    } else {
-        MaterialTheme.colorScheme.secondaryContainer
-    }
-    val foreground = if (muted) {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    } else {
-        MaterialTheme.colorScheme.onSecondaryContainer
-    }
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = background,
-        contentColor = foreground,
-    ) {
-        Text(
-            text = type.displayName(),
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
-            style = MaterialTheme.typography.labelSmall,
-        )
     }
 }
